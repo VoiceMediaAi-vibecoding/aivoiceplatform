@@ -16,27 +16,43 @@ jobs:
     timeout-minutes: 10
     env:
       PROD_DIR: /home/ubuntu/LiveKit
-      REPO_URL: https://github.com/VoiceMediaAi-vibecoding/aivoiceplatform.git
+      SRC_DIR: ${{ github.workspace }}
+      # Files/dirs to NEVER rsync into the production root — they live there
+      # already and overwriting them would either leak secrets (.env) or break
+      # the install (re-creating .venv on every deploy is slow + risky for
+      # docker layer cache).
+      RSYNC_EXCLUDES: >-
+        --exclude=.env
+        --exclude=.env.example
+        --exclude=.venv
+        --exclude=node_modules
+        --exclude=.git
+        --exclude=.next
+        --exclude=__pycache__
+        --exclude=.venv.bak
+        --exclude=deploy.log
 
     steps:
-      # NOTE: No `actions/checkout` step — we deploy directly from the
-      # runner's checkout location (where actions/checkout would have placed
-      # the code anyway), then rsync into /home/ubuntu/LiveKit which has
-      # the .env, the .venv, the running containers, and the smoke script.
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 5   # need HEAD~1 for change detection
 
-      - name: Pull latest into PROD_DIR
+      - name: Sync code from runner checkout to PROD_DIR
         run: |
-          cd "$PROD_DIR"
-          # The runner's checkout leaves the working tree in some state; align
-          # with origin/main. `--hard` discards any drift in PROD_DIR (the
-          # only "important" untracked file is .env, which git preserves).
-          git fetch origin main
-          git reset --hard origin/main
-          echo "Now at: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+          echo "Syncing $SRC_DIR → $PROD_DIR"
+          rsync -a --delete $RSYNC_EXCLUDES "$SRC_DIR/" "$PROD_DIR/"
+          echo "--- $PROD_DIR contents (top 10) ---"
+          ls -la "$PROD_DIR" | head -10
+          echo "--- last 5 commits ---"
+          cd "$PROD_DIR" && git log --oneline -5 2>/dev/null || \
+            (cd "$SRC_DIR" && git log --oneline -5)
 
       - name: Detect changed services
         id: detect
         run: |
+          # Use git in SRC_DIR (the runner's checkout — IS a git repo).
+          cd "$SRC_DIR"
           CHANGED=$(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $2}' | sort -u)
           SERVICES=""
           for path in $CHANGED; do
@@ -49,12 +65,15 @@ jobs:
           if echo "$CHANGED" | grep -q "^monitoring"; then
             SERVICES="$SERVICES prometheus grafana"
           fi
-          [ -z "$SERVICES" ] && SERVICES="api"  # default if first deploy
+          # Default to rebuilding api (most common change) so first deploys
+          # don't accidentally no-op.
+          [ -z "$SERVICES" ] && SERVICES="api"
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
-          echo "Changed: $CHANGED"
-          echo "Building: $SERVICES"
+          echo "Files changed: $CHANGED"
+          echo "Will rebuild:  $SERVICES"
 
       - name: Build changed services
+        working-directory: ${{ env.PROD_DIR }}
         run: |
           for svc in ${{ steps.detect.outputs.services }}; do
             echo "Building $svc..."
@@ -62,33 +81,39 @@ jobs:
           done
 
       - name: Apply — docker compose up -d
+        working-directory: ${{ env.PROD_DIR }}
         run: docker compose up -d ${{ steps.detect.outputs.services }}
 
-      - name: Wait for /health/ready
+      - name: Wait for api /health/ready
         run: |
           for i in $(seq 1 30); do
             CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/health/ready || echo "000")
             if [ "$CODE" = "200" ]; then
-              echo "API ready after $((i*2))s"
+              echo "✅ API ready after $((i*2))s"
               exit 0
             fi
             sleep 2
           done
-          echo "TIMEOUT: API never became ready"
+          echo "❌ TIMEOUT: api never became ready after 60s"
           exit 1
 
       - name: Smoke E2E
-        run: python3 $PROD_DIR/scripts/smoke_e2e.py
+        working-directory: ${{ env.PROD_DIR }}
+        run: python3 scripts/smoke_e2e.py
 
-      - name: Notify on success
+      - name: ✅ Deploy succeeded
         if: success()
         run: |
-          echo "✅ Deploy $(git rev-parse --short HEAD) succeeded: $(git log -1 --pretty=%s)"
+          SHORT=$(cd "$SRC_DIR" && git rev-parse --short HEAD)
+          MSG=$(cd "$SRC_DIR" && git log -1 --pretty=%s)
+          echo "✅ Deployed $SHORT: $MSG"
 
-      - name: Notify on failure
+      - name: ❌ Deploy failed
         if: failure()
         run: |
-          SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          SHORT=$(cd "$SRC_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
           echo "❌ Deploy $SHORT FAILED"
-          echo "Check: tail -50 $PROD_DIR/deploy.log"
-          echo "And:   docker compose ps"
+          echo "Check:"
+          echo "  docker compose -f $PROD_DIR/docker-compose.yml ps"
+          echo "  tail -50 $PROD_DIR/deploy.log"
+          echo "  cat /home/ubuntu/actions-runner/_diag/Runner_*.log | tail -100"
