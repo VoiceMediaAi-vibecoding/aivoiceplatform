@@ -1,0 +1,251 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: voicemedia-api-health
+    folder: VoiceMedia
+    interval: 1m
+    rules:
+      # ── Critical: dependency down ───────────────────────────────────────
+      - uid: voicemedia-livekit-down
+        title: LiveKit unreachable
+        condition: C
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "LiveKit unreachable for 1m"
+          description: |
+            The /health/ready probe for LiveKit has been reporting down for 1m.
+            Inbound + outbound SIP calls will fail. Check the livekit container
+            and the network path to it.
+          severity: critical
+        labels:
+          severity: critical
+          component: livekit
+        data:
+          - refId: A
+            queryType: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              refId: A
+              expr: dep_up{dep="livekit"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+                  type: query
+
+      - uid: voicemedia-supabase-down
+        title: Supabase unreachable
+        condition: C
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Supabase unreachable for 1m"
+          description: |
+            The /health/ready probe for Supabase has been reporting down for 1m.
+            Login, agent CRUD, and cost tracking will fail. Check Supabase
+            dashboard for incidents.
+          severity: critical
+        labels:
+          severity: critical
+          component: supabase
+        data:
+          - refId: A
+            queryType: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: PBFA97CFB590B209B
+            model:
+              refId: A
+              expr: dep_up{dep="supabase"}
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+                  type: query
+
+      # ── Warning: dependency slow ────────────────────────────────────────
+      - uid: voicemedia-dep-slow
+        title: Dependency probe latency high
+        condition: C
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "Probe latency for {{ $labels.dep }} > 500ms for 5m"
+          description: |
+            Sustained high latency from the API to {{ $labels.dep }}. User
+            experience is likely degraded (slow token issuance, slow logins).
+            Latency: {{ $value }}s.
+          severity: warning
+        labels:
+          severity: warning
+          component: "{{ $labels.dep }}"
+        data:
+          - refId: A
+            queryType: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              refId: A
+              expr: dep_probe_latency_seconds
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.5] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+                  type: query
+
+      # ── Warning: API overloaded ─────────────────────────────────────────
+      - uid: voicemedia-api-cpu-high
+        title: API process CPU high
+        condition: C
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "API CPU > 80% for 5m"
+          description: |
+            api_process_cpu_percent is {{ $value | humanize }}%. Likely
+            causes: traffic spike, runaway request handler, expensive LLM
+            call blocking the event loop. Check the latency panel in the
+            VoiceMedia dashboard.
+          severity: warning
+        labels:
+          severity: warning
+          component: api
+        data:
+          - refId: A
+            queryType: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              refId: A
+              expr: api_process_cpu_percent
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [80] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+                  type: query
+
+      - uid: voicemedia-api-memory-high
+        title: API process memory high
+        condition: C
+        noDataState: OK
+        execErrState: Error
+        for: 10m
+        annotations:
+          summary: "API memory RSS > 500MB for 10m"
+          description: |
+            api_process_memory_rss_bytes is {{ $value | humanize }}B.
+            Possible leak — consider restarting the api container or
+            investigating recent deploys.
+          severity: warning
+        labels:
+          severity: warning
+          component: api
+        data:
+          - refId: A
+            queryType: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              refId: A
+              expr: api_process_memory_rss_bytes
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [500000000] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+                  type: query
+
+      # ── Warning: HTTP 5xx rate ──────────────────────────────────────────
+      - uid: voicemedia-api-5xx
+        title: API returning 5xx
+        condition: C
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "5xx rate > 0.1 req/s for 5m on {{ $labels.path }}"
+          description: |
+            The {{ $labels.path }} route is returning 5xx responses at
+            {{ $value | humanize }} req/s. Users are seeing errors.
+          severity: warning
+        labels:
+          severity: warning
+          component: api
+        data:
+          - refId: A
+            queryType: prometheus
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              refId: A
+              expr: sum by (path) (rate(http_requests_total{status=~"5.."}[5m]))
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              refId: C
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.1] }
+                  operator: { type: and }
+                  query: { params: [A] }
+                  reducer: { type: last }
+                  type: query

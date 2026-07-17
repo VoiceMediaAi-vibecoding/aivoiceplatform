@@ -1,0 +1,86 @@
+# Monitoring VM stack — runs on a separate AWS EC2 instance in the same VPC
+# as prod. Same pattern works on any cloud with private networking (GCP,
+# Azure, Hetzner Cloud, DO).
+#
+# Topology:
+#
+#                            GoDaddy DNS
+#                                │
+#                                │ monitoring.voicemedia.ai → EIP 1.2.3.4
+#                                ▼
+#   [Public internet]    [vm-monitoring]
+#                              │  ◄──── Security Group: TCP 80, 443 from 0.0.0.0/0
+#                              ├── caddy (443 → grafana:3000, auto Let's Encrypt)
+#                              ├── grafana (127.0.0.1:3000)
+#                              └── prometheus (0.0.0.0:9090)
+#                                          ▲
+#                                          │ Security Group: TCP 9090 only from prod-VM-private-IP
+#                                          │
+#                            [vm-prod VPC private IP 10.0.0.X]
+#                                          │
+#   [vm-prod 44.247.225.191]               │
+#   ├── app stack                          │
+#   └── prometheus (remote_write → http://10.0.0.Y:9090/api/v1/write)
+#
+# Key properties:
+#   • Prometheus never touches the public internet — VPC routing only.
+#   • Grafana public, but HTTPS + Grafana's own user system gates access.
+#   • No vendor lock-in beyond AWS itself.
+
+services:
+  caddy:
+    image: caddy:2
+    container_name: monitoring-caddy-1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - grafana
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: monitoring-grafana-1
+    restart: unless-stopped
+    # Bind only to localhost so the ONLY way in is through Caddy (HTTPS).
+    network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      # Use the public hostname so links Grafana generates (alerts, etc.)
+      # point to https://monitoring.voicemedia.ai.
+      - GF_SERVER_ROOT_URL=https://monitoring.voicemedia.ai
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: monitoring-prometheus-1
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=90d"
+      - "--storage.tsdb.retention.size=50GB"
+      - "--web.enable-lifecycle"
+      - "--web.enable-remote-write-receiver"
+      # Bind on all interfaces so the prod VM can reach via private IP.
+      # AWS Security Group must restrict 9090 to prod-VM-private-IP only.
+      - "--web.listen-address=0.0.0.0:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+volumes:
+  caddy_data:
+  caddy_config:
+  grafana_data:
+  prometheus_data:

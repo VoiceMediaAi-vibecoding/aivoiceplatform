@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+.uv-cache/
+
+# Node / Next.js
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Secrets — NEVER commit
+.env
+.env.local
+.env.*.local
+monitoring/grafana/provisioning/alerting/contact-points.yaml
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Build artifacts
+*.log
+*.tar.gz
+
+# AI agent caches — regenerated per machine, not source code
+.agents/
+.claude/
+.atl/
+.mcp.json
+
+# Agent exploratory scripts (not part of the deployable codebase)
+services/api/cc.py
+services/api/ce.py
+services/api/d.py
+services/api/e2e*.py
+services/api/la.py
+services/api/mig*.py
+services/api/ov.py
+services/api/tal.py
+services/api/tb.py
+services/api/tc.py
+services/api/th.py
+services/api/tt.py
+services/api/ttf*.py
+services/api/vd.py
+services/api/vt3.py
+services/api/check.py
+VM_Devs.pem
+*.pem
+**/*.pem

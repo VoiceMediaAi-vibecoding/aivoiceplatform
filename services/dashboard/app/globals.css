@@ -1,0 +1,247 @@
+@import "tailwindcss";
+
+:root {
+  --background: #141414;
+  --foreground: #f2f2f2;
+
+  /* Brand gradient: magenta → purple → blue */
+  --brand-pink: #d602c6;
+  --brand-purple: #aa01bc;
+  --brand-blue: #6f00fe;
+
+  --grid-line: rgba(255, 255, 255, 0.04);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+
+  /* ── shadcn/ui design tokens (dark theme) ── */
+  --card: 255 255 255 / 0.04;
+  --card-foreground: 242 242 242;
+  --popover: 24 24 24;
+  --popover-foreground: 242 242 242;
+  --primary: 214 2 198;
+  --primary-foreground: 255 255 255;
+  --secondary: 255 255 255 / 0.08;
+  --secondary-foreground: 200 200 200;
+  --muted: 255 255 255 / 0.06;
+  --muted-foreground: 140 140 140;
+  --accent: 170 1 188;
+  --accent-foreground: 255 255 255;
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+  --border: 255 255 255 / 0.08;
+  --input: 255 255 255 / 0.08;
+  --ring: 214 2 198;
+  --radius: 0.75rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-blue: var(--brand-blue);
+  /* shadcn token mappings */
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-secondary: rgb(var(--secondary));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+  --color-destructive: rgb(var(--destructive));
+  --color-destructive-foreground: rgb(var(--destructive-foreground));
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+  --color-ring: rgb(var(--ring));
+  --color-card: rgb(var(--card));
+  --color-card-foreground: rgb(var(--card-foreground));
+  --color-popover: rgb(var(--popover));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius: var(--radius);
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  position: relative;
+  min-height: 100%;
+}
+
+/* ── Backdrop: layered brand-gradient glows + technical grid ── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(214, 2, 198, 0.16), transparent 60%),
+    radial-gradient(50rem 36rem at 110% 10%, rgba(111, 0, 254, 0.14), transparent 60%),
+    radial-gradient(48rem 40rem at 50% 120%, rgba(170, 1, 188, 0.12), transparent 60%),
+    var(--background);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 90%);
+}
+
+/* ── Glassmorphism surfaces ── */
+.glass-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 0 0 1px rgba(214, 2, 198, 0.18), 0 12px 40px -12px rgba(170, 1, 188, 0.4);
+}
+
+/* ── Gradient text / accents (brand: pink → purple → blue) ── */
+.gradient-text {
+  background: linear-gradient(90deg, var(--brand-pink), var(--brand-purple), var(--brand-blue));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-shift 8s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+/* ── Status pulse dot ── */
+.status-dot {
+  position: relative;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+}
+
+.status-dot::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: inherit;
+  opacity: 0.45;
+  animation: status-pulse 2s ease-out infinite;
+}
+
+@keyframes status-pulse {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  70% { transform: scale(2.1); opacity: 0; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Fade-in-up entrance for cards/sections ── */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease both;
+}
+
+/* ── Floating blobs / particles (brand-gradient ambience) ── */
+@keyframes blob {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -50px) scale(1.1); }
+  66%  { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+.animate-blob {
+  animation: blob 7s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-20px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes particle-drift {
+  0%   { transform: translateX(-150px) translateY(100px) scale(0.5); opacity: 0; }
+  20%  { transform: translateX(-30px) translateY(50px) scale(1); opacity: 1; }
+  40%  { transform: translateX(80px) translateY(-20px) scale(1.2); }
+  60%  { transform: translateX(200px) translateY(-100px) scale(0.8); }
+  80%  { transform: translateX(350px) translateY(-30px) scale(1.1); opacity: 0.9; }
+  100% { transform: translateX(calc(100vw + 150px)) translateY(-120px) scale(0.3); opacity: 0; }
+}
+.animate-particle-drift {
+  animation: particle-drift 10s linear infinite;
+}
+
+/* ── Agent waveform bars (Client Portal "Agent is Live" hero) ── */
+@keyframes agent-waveform {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.6; }
+  50%      { transform: scaleY(1); opacity: 1; }
+}
+
+.animated {
+  will-change: transform, opacity;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated,
+  .animate-blob,
+  .animate-float,
+  .animate-particle-drift,
+  [style*="agent-waveform"],
+  .gradient-text,
+  .status-dot::after,
+  .animate-fade-in-up {
+    animation: none !important;
+  }
+}

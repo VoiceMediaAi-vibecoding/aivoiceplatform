@@ -1,0 +1,40 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: voicemedia-prod
+    monitor: voicemedia-prod
+
+remote_write:
+  # Forward every sample to the monitoring VM's Prometheus over the AWS
+  # private network. The URL is the monitoring VM's PRIVATE IP — never
+  # touches the public internet.
+  #
+  # Security is the VPC routing + the monitoring VM's security group,
+  # which restricts port 9090 to this prod VM's private IP. No auth
+  # headers needed because the network IS the auth boundary.
+  #
+  # Before deploying, replace 10.0.0.MONITORING with the actual private
+  # IP of the monitoring VM (visible in EC2 console → Networking).
+  - url: http://10.0.0.MONITORING:9090/api/v1/write
+    write_relabel_configs:
+      # Drop the monitoring Prometheus self-scrape from being re-forwarded
+      # (would loop). Anything from these jobs stays local only.
+      - source_labels: [job]
+        regex: monitoring-prometheus-self|monitoring-grafana
+        action: drop
+
+scrape_configs:
+  - job_name: voicemedia-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api:8000
+        labels:
+          service: api
+          tier: backend
+
+  - job_name: prometheus-self
+    static_configs:
+      - targets:
+          - localhost:9090

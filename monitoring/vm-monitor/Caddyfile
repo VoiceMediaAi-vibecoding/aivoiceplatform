@@ -1,0 +1,31 @@
+# Caddy config — auto-HTTPS via Let's Encrypt, reverse proxy to Grafana.
+# Replace the email below with a real address (Let's Encrypt notifies you
+# there when certs are about to expire).
+
+monitoring.voicemedia.ai {
+    encode gzip zstd
+
+    # Rate limit at the edge. Cheap defense against scraping/brute force.
+    # 100 req/s sustained per client IP; burst of 50.
+    @blocked not client_ip 192.168.0.0/16 10.0.0.0/8
+    rate_limit @blocked 100r/s 50
+
+    reverse_proxy grafana:3000 {
+        # Pass through the real client IP to Grafana (X-Forwarded-For).
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Health check — drop connections to a dead Grafana fast.
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 5s
+    }
+}
+
+# Optional: tighten further with HTTP basic auth in front of Grafana.
+# This is belt-and-suspenders on top of Grafana's own login.
+# Uncomment after generating a password hash with: caddy hash-password
+#    basicauth {
+#        admin JDJhJDE0JDhCc2dUMktnTE9OLzgubS5YYXp1YU1xLjBOWXVL
+#    }

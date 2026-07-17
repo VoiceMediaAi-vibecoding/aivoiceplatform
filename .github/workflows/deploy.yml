@@ -1,0 +1,71 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # manual trigger from the GitHub UI
+
+# Never run two deploys at once on the same VM.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy to production
+    # `self-hosted` is the label the runner registers itself with. Change
+    # this if you named your runner differently when you installed it.
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 5    # need the previous commit for rollback
+
+      - name: Detect which services changed
+        id: detect
+        run: |
+          # Build a comma-separated list of services whose files changed
+          # since the previous commit. Used to avoid rebuilding services
+          # we didn't touch (sip, livekit, redis are image-based).
+          CHANGED=$(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $2}' | sort -u)
+          SERVICES=""
+          for path in $CHANGED; do
+            case "$path" in
+              api)      SERVICES="$SERVICES api" ;;
+              agent)    SERVICES="$SERVICES agent" ;;
+              dashboard) SERVICES="$SERVICES dashboard" ;;
+              # docker-compose, monitoring, scripts → no rebuild needed,
+              # just `docker compose up -d` is enough
+            esac
+          done
+          # Always include "prometheus grafana" if monitoring/ changed so
+          # they get recreated with the new config.
+          if echo "$CHANGED" | grep -q "^monitoring"; then
+            SERVICES="$SERVICES prometheus grafana"
+          fi
+          echo "services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "Detected changed services: $SERVICES"
+
+      - name: Run deploy script
+        env:
+          SMOKE: "1"
+        run: bash scripts/deploy.sh ${{ steps.detect.outputs.services }}
+
+      - name: Notify on success
+        if: success()
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "✅ Deploy $SHORT_SHA succeeded: $COMMIT_MSG"
+          # Wire a Slack/Discord/Google Chat webhook here later. GitHub
+          # already sends commit-status emails; this is for ops dashboards.
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "❌ Deploy $SHORT_SHA FAILED — automatic rollback should have run"
+          echo "Check $REPO_DIR/deploy.log and `docker compose ps`"

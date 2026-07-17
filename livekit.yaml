@@ -1,0 +1,19 @@
+port: 7880
+bind_addresses:
+  - ""
+
+# API keys
+keys:
+  devkey: secret
+
+# Redis (required for SIP)
+redis:
+  address: redis:6379
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: true
+
+logging:
+  level: info

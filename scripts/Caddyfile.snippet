@@ -1,0 +1,19 @@
+dashboard.voicemedia.ai {
+    reverse_proxy localhost:3000
+}
+
+api.voicemedia.ai {
+    reverse_proxy localhost:8000
+}
+
+# WSS proxy for the LiveKit WebRTC server.
+# Browsers (Chrome, Firefox, Safari) block ws:// connections from HTTPS pages
+# (mixed content), so the Talk feature in the agent builder needs a TLS-fronted
+# WebSocket endpoint. Caddy auto-provisions the Let's Encrypt cert for
+# livekit.voicemedia.ai the first time it sees a successful DNS lookup.
+#
+# Required DNS: A record `livekit.voicemedia.ai -> 44.247.225.191`
+# After this entry is added, run `systemctl reload caddy` (or the equivalent).
+livekit.voicemedia.ai {
+    reverse_proxy localhost:7880
+}

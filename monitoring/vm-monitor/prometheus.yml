@@ -1,0 +1,24 @@
+global:
+  evaluation_interval: 1m
+  external_labels:
+    cluster: voicemedia-prod
+    receiver: monitoring-vm
+
+# This Prometheus's only job is to receive remote_write from the prod VM
+# over Tailscale and serve queries to the local Grafana. The remote_write
+# receiver is enabled by the --web.enable-remote-write-receiver flag in
+# docker-compose.yml — no config block needed on the receiving side.
+
+scrape_configs:
+  # Self-scrape for monitoring Prometheus's own metrics.
+  - job_name: monitoring-prometheus-self
+    static_configs:
+      - targets:
+          - localhost:9090
+
+  # Grafana on this host — scrape its /metrics so we can see dashboard
+  # query rates, alert eval counts, etc.
+  - job_name: monitoring-grafana
+    static_configs:
+      - targets:
+          - localhost:3000

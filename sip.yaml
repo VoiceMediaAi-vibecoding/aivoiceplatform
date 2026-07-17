@@ -1,0 +1,27 @@
+# LiveKit SIP Server configuration
+# NOTE: despite docker-compose also passing LIVEKIT_API_KEY/LIVEKIT_API_SECRET as
+# env vars, this image version reads api_key/api_secret directly from this YAML
+# file (env vars are NOT honored in practice — confirmed via "invalid API key:
+# your-livekit-api-key" auth errors when these were left as placeholders).
+# Must match the `keys:` entry in livekit.yaml and LIVEKIT_API_KEY/SECRET in .env.
+api_key: devkey
+api_secret: secret
+ws_url: ws://localhost:7880
+
+redis:
+  address: 127.0.0.1:6379
+
+# SIP signaling port (must be open to internet — TCP/UDP)
+# SECURITY: Access restricted to Twilio SIP IPs via iptables (scripts/sip_firewall.sh).
+# Do NOT open port 5060 broadly — this server has no built-in IP allowlist.
+sip_port: 5060
+
+# RTP media port range (must be open to internet — UDP)
+# Protected by iptables SIP_ALLOWLIST chain: only Twilio IPs allowed.
+rtp_port: 10000-20000
+
+# Use the server's external/public IP for RTP
+use_external_ip: true
+
+logging:
+  level: info

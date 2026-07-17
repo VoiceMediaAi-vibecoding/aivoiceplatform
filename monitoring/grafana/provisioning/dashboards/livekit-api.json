@@ -1,0 +1,101 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API uptime",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "api_uptime_seconds", "refId": "A"}
+      ],
+      "options": {
+        "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false},
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "stat",
+      "title": "Process CPU %",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [
+        {"expr": "api_process_cpu_percent", "refId": "A"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "percent", "thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": null}, {"color": "yellow", "value": 60}, {"color": "red", "value": 85}
+      ]}}}
+    },
+    {
+      "type": "stat",
+      "title": "Memory RSS",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "api_process_memory_rss_bytes", "refId": "A"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "bytes"}}
+    },
+    {
+      "type": "stat",
+      "title": "Open FDs",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {"expr": "api_process_open_fds", "refId": "A"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Dependency reachability",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {"expr": "dep_up", "refId": "A", "legendFormat": "{{dep}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "min": 0, "max": 1}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Dependency probe latency",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {"expr": "dep_probe_latency_seconds", "refId": "A", "legendFormat": "{{dep}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP requests by route (rate / 1m)",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 11},
+      "targets": [
+        {"expr": "sum by (path) (rate(http_requests_total[1m]))", "refId": "A", "legendFormat": "{{path}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP request latency p95",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 19},
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (path, le) (rate(http_request_duration_seconds_bucket[5m])))", "refId": "A", "legendFormat": "p95 {{path}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["voicemedia", "api"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "VoiceMedia API — Live Overview",
+  "uid": "voicemedia-api-overview",
+  "version": 1,
+  "weekStart": ""
+}

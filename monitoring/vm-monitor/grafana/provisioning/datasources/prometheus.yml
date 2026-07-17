@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # This is the local Prometheus on the monitoring VM. Grafana reaches
+    # it over the docker network — never goes public.
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
+      # Increase query timeout — cross-AZ Prometheus queries can be slow.
+      queryTimeout: 60s

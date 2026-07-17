@@ -1,0 +1,185 @@
+services:
+  # LiveKit WebRTC Server
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit/livekit.yaml
+    ports:
+      - "7880:7880"       # WebSocket signaling
+      - "7881:7881"       # TCP RTC
+      - "7882:7882/udp"   # UDP RTC
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml
+    healthcheck:
+      # livekit-server returns its version on the HTTP root; busybox wget ships in the alpine image.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7880/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Redis (required by SIP server)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"   # Expose to localhost for SIP host-network container
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # LiveKit SIP Server (Twilio telephony)
+  # Uses host networking to avoid mapping 10k UDP ports (would crash the server)
+  sip:
+    image: livekit/sip:latest
+    network_mode: host
+    volumes:
+      - ./sip.yaml:/etc/livekit/sip.yaml
+    command: --config /etc/livekit/sip.yaml
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+    healthcheck:
+      # The livekit/sip image is a minimal Go binary on alpine — no nc, no
+      # curl, no python. But it has bash and /proc is always available.
+      # We verify two things:
+      #   1. PID 1 (the sip process) is alive — catches crashes that the
+      #      restart policy doesn't immediately retry.
+      #   2. The UDP SIP socket is bound to port 5060 — appears in
+      #      /proc/net/udp6 as ":13C4" (5060 in hex). When the process
+      #      dies the kernel cleans the socket and the entry vanishes.
+      test: ["CMD-SHELL", "test -d /proc/1 && grep -q ':13C4' /proc/net/udp6 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      livekit:
+        condition: service_healthy
+
+  # FastAPI token + cost API
+  api:
+    build: ./services/api
+    ports:
+      - "8000:8000"
+    env_file: .env
+    volumes:
+      - ./services/api:/app          # Mount full api dir for hot-reload
+      - ./services/dialer:/app/dialer  # Dialer accessible from API
+    healthcheck:
+      # /health/ready returns 503 if Supabase OR LiveKit is unreachable, so
+      # Docker will mark this container unhealthy and restart it on dep loss.
+      test: ["CMD-SHELL", "python -c 'import urllib.request; r=urllib.request.urlopen(\"http://127.0.0.1:8000/health/ready\", timeout=2); exit(0 if r.status==200 else 1)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 25s
+    restart: unless-stopped
+    depends_on:
+      livekit:
+        condition: service_healthy
+
+  # Prometheus — scrapes api:8000/metrics every 15s. Bound to localhost only;
+  # not exposed to the public internet. Grafana talks to it over the internal
+  # docker network.
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: livekit-prometheus-1
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Grafana — pre-provisioned with Prometheus as a datasource and a starter
+  # dashboard for the API. Default login is admin / voicemedia-grafana-admin
+  # — CHANGE THE PASSWORD on first login (auth.anonymous.enabled=false).
+  grafana:
+    image: grafana/grafana:latest
+    container_name: livekit-grafana-1
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=voicemedia-grafana-admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Python voice agent
+  agent:
+    build: ./services/agent
+    env_file: .env
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+      - AGENT_HEALTH_PORT=8089
+    ports:
+      - "127.0.0.1:8089:8089"   # /health endpoint, only on localhost
+    volumes:
+      - ./services/agent/src:/app/src   # Mount src so code updates don't need rebuild
+    healthcheck:
+      # Uses the stdlib HTTP server in src/agent.py — see _start_health_server.
+      # /health returns 200 whenever the process is up. /health/ready returns
+      # 503 until the agent has connected to LiveKit at least once.
+      test: ["CMD-SHELL", "python -c 'import urllib.request; r=urllib.request.urlopen(\"http://127.0.0.1:8089/health\", timeout=2); exit(0 if r.status==200 else 1)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      livekit:
+        condition: service_healthy
+
+  # Next.js dashboard (dev mode — no heavy build needed)
+  dashboard:
+    build: ./services/dashboard
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api.voicemedia.ai
+      - NEXT_PUBLIC_LIVEKIT_URL=ws://44.247.225.191:7880
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 25s
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    # S1.4 — source is no longer mounted. The image bakes in `next build`
+    # output (standalone) so we don't need live source mounts. To iterate
+    # during development, run `npm run dev` outside Docker on your
+    # workstation, or override the command with `command: ["npm", "run",
+    # "dev"]` in a docker-compose.override.yml.
+
+volumes:
+  prometheus_data:
+  grafana_data:

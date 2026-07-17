@@ -1,0 +1,255 @@
+<!--
+  Templates de correo para Supabase Auth — VoiceMedia
+  Colores de marca: #d602c6 (pink), #aa01bc (purple), #6f00fe (blue)
+  Logo: https://dashboard.voicemedia.ai/logo.png
+
+  Cómo usar:
+  1. En Supabase Dashboard → Authentication → Email Templates
+  2. Selecciona cada tipo de correo (Confirm signup, Invite user, Magic Link,
+     Change Email Address, Reset Password, Reauthentication)
+  3. Copia y pega el HTML correspondiente abajo en el campo "Message body"
+  4. Ajusta el "Subject" sugerido para cada uno
+  5. Guarda cambios
+-->
+
+
+<!-- ============================================================ -->
+<!-- 1) CONFIRM SIGNUP                                             -->
+<!-- Subject: Confirma tu cuenta en VoiceMedia                     -->
+<!-- ============================================================ -->
+<div style="background-color:#141414;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background-color:#1e1e1e;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
+    <tr>
+      <td style="background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 0 32px;text-align:center;">
+        <img src="https://dashboard.voicemedia.ai/logo.png" alt="VoiceMedia" width="180" style="display:block;margin:0 auto;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 8px 32px;color:#f2f2f2;">
+        <h1 style="font-size:20px;margin:0 0 16px 0;font-weight:600;">Confirma tu cuenta</h1>
+        <p style="font-size:14px;line-height:1.6;color:#bdbdbd;margin:0 0 24px 0;">
+          Gracias por registrarte en VoiceMedia. Confirma tu correo para activar tu cuenta y empezar a usar la plataforma.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 32px 32px 32px;text-align:center;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;">
+          Confirmar cuenta
+        </a>
+        <p style="font-size:12px;color:#777777;margin:24px 0 0 0;">
+          Si no creaste esta cuenta, puedes ignorar este correo.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+        <p style="font-size:11px;color:#666666;margin:0;">© VoiceMedia · dashboard.voicemedia.ai</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- 2) INVITE USER                                                -->
+<!-- Subject: Te invitaron a VoiceMedia                            -->
+<!-- ============================================================ -->
+<div style="background-color:#141414;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background-color:#1e1e1e;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
+    <tr>
+      <td style="background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 0 32px;text-align:center;">
+        <img src="https://dashboard.voicemedia.ai/logo.png" alt="VoiceMedia" width="180" style="display:block;margin:0 auto;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 8px 32px;color:#f2f2f2;">
+        <h1 style="font-size:20px;margin:0 0 16px 0;font-weight:600;">Tienes una invitación</h1>
+        <p style="font-size:14px;line-height:1.6;color:#bdbdbd;margin:0 0 24px 0;">
+          Te invitaron a unirte a la plataforma de VoiceMedia. Haz clic en el botón para crear tu cuenta y configurar tu contraseña.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 32px 32px 32px;text-align:center;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;">
+          Aceptar invitación
+        </a>
+        <p style="font-size:12px;color:#777777;margin:24px 0 0 0;">
+          Si no esperabas esta invitación, puedes ignorar este correo.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+        <p style="font-size:11px;color:#666666;margin:0;">© VoiceMedia · dashboard.voicemedia.ai</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- 3) MAGIC LINK                                                 -->
+<!-- Subject: Tu enlace de acceso a VoiceMedia                     -->
+<!-- ============================================================ -->
+<div style="background-color:#141414;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background-color:#1e1e1e;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
+    <tr>
+      <td style="background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 0 32px;text-align:center;">
+        <img src="https://dashboard.voicemedia.ai/logo.png" alt="VoiceMedia" width="180" style="display:block;margin:0 auto;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 8px 32px;color:#f2f2f2;">
+        <h1 style="font-size:20px;margin:0 0 16px 0;font-weight:600;">Tu enlace de acceso</h1>
+        <p style="font-size:14px;line-height:1.6;color:#bdbdbd;margin:0 0 24px 0;">
+          Haz clic en el botón para iniciar sesión en VoiceMedia. Este enlace es de un solo uso y expira pronto.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 32px 32px 32px;text-align:center;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;">
+          Iniciar sesión
+        </a>
+        <p style="font-size:12px;color:#777777;margin:24px 0 0 0;">
+          Si no solicitaste este enlace, puedes ignorar este correo.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+        <p style="font-size:11px;color:#666666;margin:0;">© VoiceMedia · dashboard.voicemedia.ai</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- 4) CHANGE EMAIL ADDRESS                                       -->
+<!-- Subject: Confirma tu nuevo correo en VoiceMedia               -->
+<!-- ============================================================ -->
+<div style="background-color:#141414;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background-color:#1e1e1e;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
+    <tr>
+      <td style="background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 0 32px;text-align:center;">
+        <img src="https://dashboard.voicemedia.ai/logo.png" alt="VoiceMedia" width="180" style="display:block;margin:0 auto;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 8px 32px;color:#f2f2f2;">
+        <h1 style="font-size:20px;margin:0 0 16px 0;font-weight:600;">Confirma tu nuevo correo</h1>
+        <p style="font-size:14px;line-height:1.6;color:#bdbdbd;margin:0 0 24px 0;">
+          Recibimos una solicitud para cambiar el correo asociado a tu cuenta de VoiceMedia a esta dirección. Confírmalo para completar el cambio.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 32px 32px 32px;text-align:center;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;">
+          Confirmar nuevo correo
+        </a>
+        <p style="font-size:12px;color:#777777;margin:24px 0 0 0;">
+          Si no solicitaste este cambio, ignora este correo o contacta a soporte.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+        <p style="font-size:11px;color:#666666;margin:0;">© VoiceMedia · dashboard.voicemedia.ai</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- 5) RESET PASSWORD                                             -->
+<!-- Subject: Restablece tu contraseña de VoiceMedia               -->
+<!-- ============================================================ -->
+<div style="background-color:#141414;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background-color:#1e1e1e;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
+    <tr>
+      <td style="background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 0 32px;text-align:center;">
+        <img src="https://dashboard.voicemedia.ai/logo.png" alt="VoiceMedia" width="180" style="display:block;margin:0 auto;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 8px 32px;color:#f2f2f2;">
+        <h1 style="font-size:20px;margin:0 0 16px 0;font-weight:600;">Restablece tu contraseña</h1>
+        <p style="font-size:14px;line-height:1.6;color:#bdbdbd;margin:0 0 24px 0;">
+          Recibimos una solicitud para restablecer la contraseña de tu cuenta en VoiceMedia. Haz clic en el botón para crear una nueva.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 32px 32px 32px;text-align:center;">
+        <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:14px 32px;border-radius:8px;">
+          Restablecer contraseña
+        </a>
+        <p style="font-size:12px;color:#777777;margin:24px 0 0 0;">
+          Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña actual seguirá funcionando.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+        <p style="font-size:11px;color:#666666;margin:0;">© VoiceMedia · dashboard.voicemedia.ai</p>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- 6) REAUTHENTICATION (código OTP)                              -->
+<!-- Subject: Tu código de verificación de VoiceMedia              -->
+<!-- ============================================================ -->
+<div style="background-color:#141414;padding:40px 20px;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background-color:#1e1e1e;border-radius:12px;overflow:hidden;border:1px solid #2a2a2a;">
+    <tr>
+      <td style="background:linear-gradient(90deg,#d602c6,#aa01bc,#6f00fe);height:6px;line-height:6px;font-size:0;">&nbsp;</td>
+    </tr>
+    <tr>
+      <td style="padding:32px 32px 0 32px;text-align:center;">
+        <img src="https://dashboard.voicemedia.ai/logo.png" alt="VoiceMedia" width="180" style="display:block;margin:0 auto;" />
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:24px 32px 8px 32px;color:#f2f2f2;text-align:center;">
+        <h1 style="font-size:20px;margin:0 0 16px 0;font-weight:600;">Código de verificación</h1>
+        <p style="font-size:14px;line-height:1.6;color:#bdbdbd;margin:0 0 24px 0;">
+          Usa el siguiente código para confirmar tu identidad en VoiceMedia:
+        </p>
+        <div style="display:inline-block;background-color:#141414;border:1px solid #2a2a2a;border-radius:8px;padding:16px 32px;margin-bottom:24px;">
+          <span style="font-size:28px;letter-spacing:8px;font-weight:700;color:#ffffff;">{{ .Token }}</span>
+        </div>
+        <p style="font-size:12px;color:#777777;margin:0;">
+          Este código expira en unos minutos. Si no lo solicitaste, ignora este correo.
+        </p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 32px;border-top:1px solid #2a2a2a;text-align:center;">
+        <p style="font-size:11px;color:#666666;margin:0;">© VoiceMedia · dashboard.voicemedia.ai</p>
+      </td>
+    </tr>
+  </table>
+</div>

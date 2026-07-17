@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# Cancel in-progress runs of the same workflow on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: api tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install Python
+        run: uv python install 3.11
+
+      - name: Sync dev deps
+        working-directory: services/api
+        run: uv sync --dev
+
+      - name: Run pytest
+        working-directory: services/api
+        # DISABLE_READINESS_PROBES=1 keeps the background probe loop from
+        # racing the test fixtures. Live tests use the livekit/sip/redis
+        # config from conftest.py — they don't need real services.
+        env:
+          DISABLE_READINESS_PROBES: "1"
+        run: uv run pytest tests/ -v --tb=short
+
+  # Future: agent tests, dashboard tests, etc. Same pattern — uv sync --dev
+  # then uv run pytest in the service directory.
+
+  smoke-e2e-dry:
+    name: smoke e2e (compile check only)
+    runs-on: ubuntu-latest
+    # The smoke script hits the live VM and Twilio API — that needs creds
+    # and network access the runner doesn't have. We compile-check it here
+    # and leave live execution to a self-hosted runner (or manual cron).
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Bytecode-compile smoke_e2e.py
+        run: python -m py_compile scripts/smoke_e2e.py
