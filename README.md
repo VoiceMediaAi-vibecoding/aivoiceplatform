@@ -712,3 +712,4 @@ from `api_usage`). Transcripts/recordings: `/calls` and the related session.
 | Esquema BD / DB schema | `docs/supabase_schema.sql` |
 | Despliegue / Deployment | `scripts/` |
 
+# testing branch protection
