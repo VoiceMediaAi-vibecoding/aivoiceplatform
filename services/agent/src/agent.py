@@ -1351,9 +1351,10 @@ async def entrypoint(ctx: object) -> None:
         "caller_country": caller_country,
     })
     logger.info(
-        f"[cost_estimate] ${estimate['total_per_min']:.4f}/min total "
-        f"(stt=${estimate['stt_per_min']:.4f}, llm=${estimate['llm_per_min']:.4f}, "
-        f"tts=${estimate['tts_per_min']:.4f}, twilio=${estimate['twilio_voice_per_min']:.4f} [{caller_country}]) for {cfg['name']}"
+        f"[cost_estimate] ${estimate.get('total_per_min', 0):.4f}/min total "
+        f"(stt=${estimate.get('stt_per_min', 0):.4f}, llm=${estimate.get('llm_per_min', 0):.4f}, "
+        f"tts=${estimate.get('tts_per_min', 0):.4f}, twilio=${estimate.get('twilio_voice_per_min', 0):.4f} "
+        f"[{caller_country}]) for {cfg['name']}"
     )
 
     # Create the `sessions` row now (real `started_at`, FK target for `api_usage`

@@ -38,8 +38,22 @@ jobs:
           DISABLE_READINESS_PROBES: "1"
         run: uv run pytest tests/ -v --tb=short
 
-  # Future: agent tests, dashboard tests, etc. Same pattern — uv sync --dev
-  # then uv run pytest in the service directory.
+  agent:
+    name: agent tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+      - name: Install Python
+        run: uv python install 3.11
+      - name: Sync dev deps
+        working-directory: services/agent
+        run: uv sync --dev
+      - name: Run pytest
+        working-directory: services/agent
+        run: uv run pytest tests/ -v --tb=short
 
   smoke-e2e-dry:
     name: smoke e2e (compile check only)

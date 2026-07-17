@@ -96,6 +96,11 @@ def estimate_cost_per_min(cfg: dict) -> dict:
         "stt_per_min":  round(stt_per_min,  5),
         "llm_per_min":  round(llm_per_min,  5),
         "tts_per_min":  round(tts_per_min,  5),
+        # Twilio voice only applies when calls are routed over PSTN (SIP trunks).
+        # The dashboard "Talk" feature uses LiveKit rooms directly, so it's
+        # 0 there — but we always include the key so callers can format
+        # the line unconditionally without KeyError. See agent.py:1356.
+        "twilio_voice_per_min":  0.0,
         "total_per_min": round(total, 5),
         "currency": "USD",
         "assumptions": {
