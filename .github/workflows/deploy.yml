@@ -84,26 +84,33 @@ jobs:
         working-directory: ${{ env.PROD_DIR }}
         run: docker compose up -d ${{ steps.detect.outputs.services }}
 
-      - name: Wait for api to be Docker-healthy (not just HTTP-responding)
+      - name: Wait for all healthchecked containers to be Docker-healthy
         run: |
-          # The Docker healthcheck polls every 10s with start_period=25s.
-          # Wait up to 90s for it to flip from "starting" to "healthy".
-          # Just hitting /health/ready isn't enough — the smoke checks
-          # `docker compose ps` output which only shows `(healthy)` after
-          # the Docker-internal healthcheck has passed at least once.
-          for i in $(seq 1 45); do
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' livekit-api-1 2>/dev/null || echo "none")
-            if [ "$STATUS" = "healthy" ]; then
-              echo "✅ Docker reports api as healthy after $((i*2))s"
-              # Also confirm the HTTP endpoint actually responds
-              HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/health/ready || echo "000")
-              echo "HTTP /health/ready = $HTTP"
+          # Each healthchecked service has its own Docker healthcheck (10s
+          # interval, ~25s start_period). We must wait for ALL of them to
+          # flip from "starting" to "healthy" — otherwise `docker compose ps`
+          # in the smoke shows them as "Up N seconds" (running, not healthy)
+          # and the smoke's "all healthchecked services healthy" check fails.
+          SERVICES="livekit-redis-1 livekit-livekit-1 livekit-api-1 livekit-dashboard-1 livekit-sip-1 livekit-agent-1"
+          for i in $(seq 1 60); do
+            ALL_HEALTHY=1
+            for svc in $SERVICES; do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$svc" 2>/dev/null || echo "none")
+              if [ "$STATUS" != "healthy" ]; then
+                ALL_HEALTHY=0
+                printf "%s=%s " "$svc" "$STATUS"
+              fi
+            done
+            if [ "$ALL_HEALTHY" = "1" ]; then
+              echo ""
+              echo "✅ All 6 healthchecked containers are healthy after $((i*2))s"
               exit 0
             fi
             sleep 2
           done
-          echo "❌ TIMEOUT: livekit-api-1 never became Docker-healthy after 90s"
-          docker inspect --format='{{json .State.Health}}' livekit-api-1 2>&1 | head -20
+          echo ""
+          echo "❌ TIMEOUT: not all containers became Docker-healthy after 120s"
+          docker compose ps
           exit 1
 
       - name: Smoke E2E
