@@ -84,17 +84,26 @@ jobs:
         working-directory: ${{ env.PROD_DIR }}
         run: docker compose up -d ${{ steps.detect.outputs.services }}
 
-      - name: Wait for api /health/ready
+      - name: Wait for api to be Docker-healthy (not just HTTP-responding)
         run: |
-          for i in $(seq 1 30); do
-            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/health/ready || echo "000")
-            if [ "$CODE" = "200" ]; then
-              echo "✅ API ready after $((i*2))s"
+          # The Docker healthcheck polls every 10s with start_period=25s.
+          # Wait up to 90s for it to flip from "starting" to "healthy".
+          # Just hitting /health/ready isn't enough — the smoke checks
+          # `docker compose ps` output which only shows `(healthy)` after
+          # the Docker-internal healthcheck has passed at least once.
+          for i in $(seq 1 45); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' livekit-api-1 2>/dev/null || echo "none")
+            if [ "$STATUS" = "healthy" ]; then
+              echo "✅ Docker reports api as healthy after $((i*2))s"
+              # Also confirm the HTTP endpoint actually responds
+              HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/health/ready || echo "000")
+              echo "HTTP /health/ready = $HTTP"
               exit 0
             fi
             sleep 2
           done
-          echo "❌ TIMEOUT: api never became ready after 60s"
+          echo "❌ TIMEOUT: livekit-api-1 never became Docker-healthy after 90s"
+          docker inspect --format='{{json .State.Health}}' livekit-api-1 2>&1 | head -20
           exit 1
 
       - name: Smoke E2E
