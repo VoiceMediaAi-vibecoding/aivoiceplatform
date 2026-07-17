@@ -711,3 +711,4 @@ from `api_usage`). Transcripts/recordings: `/calls` and the related session.
 | Config LiveKit/SIP | `livekit.yaml`, `sip.yaml` |
 | Esquema BD / DB schema | `docs/supabase_schema.sql` |
 | Despliegue / Deployment | `scripts/` |
+
