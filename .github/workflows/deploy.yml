@@ -3,9 +3,8 @@ name: deploy
 on:
   push:
     branches: [main]
-  workflow_dispatch:        # manual trigger from the GitHub UI
+  workflow_dispatch:
 
-# Never run two deploys at once on the same VM.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
@@ -13,23 +12,31 @@ concurrency:
 jobs:
   deploy:
     name: deploy to production
-    # `self-hosted` is the label the runner registers itself with. Change
-    # this if you named your runner differently when you installed it.
     runs-on: self-hosted
     timeout-minutes: 10
+    env:
+      PROD_DIR: /home/ubuntu/LiveKit
+      REPO_URL: https://github.com/VoiceMediaAi-vibecoding/aivoiceplatform.git
 
     steps:
-      - name: Check out the pushed commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 5    # need the previous commit for rollback
+      # NOTE: No `actions/checkout` step — we deploy directly from the
+      # runner's checkout location (where actions/checkout would have placed
+      # the code anyway), then rsync into /home/ubuntu/LiveKit which has
+      # the .env, the .venv, the running containers, and the smoke script.
 
-      - name: Detect which services changed
+      - name: Pull latest into PROD_DIR
+        run: |
+          cd "$PROD_DIR"
+          # The runner's checkout leaves the working tree in some state; align
+          # with origin/main. `--hard` discards any drift in PROD_DIR (the
+          # only "important" untracked file is .env, which git preserves).
+          git fetch origin main
+          git reset --hard origin/main
+          echo "Now at: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+
+      - name: Detect changed services
         id: detect
         run: |
-          # Build a comma-separated list of services whose files changed
-          # since the previous commit. Used to avoid rebuilding services
-          # we didn't touch (sip, livekit, redis are image-based).
           CHANGED=$(git diff --name-only HEAD~1 HEAD | awk -F/ '{print $2}' | sort -u)
           SERVICES=""
           for path in $CHANGED; do
@@ -37,35 +44,51 @@ jobs:
               api)      SERVICES="$SERVICES api" ;;
               agent)    SERVICES="$SERVICES agent" ;;
               dashboard) SERVICES="$SERVICES dashboard" ;;
-              # docker-compose, monitoring, scripts → no rebuild needed,
-              # just `docker compose up -d` is enough
             esac
           done
-          # Always include "prometheus grafana" if monitoring/ changed so
-          # they get recreated with the new config.
           if echo "$CHANGED" | grep -q "^monitoring"; then
             SERVICES="$SERVICES prometheus grafana"
           fi
+          [ -z "$SERVICES" ] && SERVICES="api"  # default if first deploy
           echo "services=$SERVICES" >> $GITHUB_OUTPUT
-          echo "Detected changed services: $SERVICES"
+          echo "Changed: $CHANGED"
+          echo "Building: $SERVICES"
 
-      - name: Run deploy script
-        env:
-          SMOKE: "1"
-        run: bash scripts/deploy.sh ${{ steps.detect.outputs.services }}
+      - name: Build changed services
+        run: |
+          for svc in ${{ steps.detect.outputs.services }}; do
+            echo "Building $svc..."
+            docker compose build "$svc"
+          done
+
+      - name: Apply — docker compose up -d
+        run: docker compose up -d ${{ steps.detect.outputs.services }}
+
+      - name: Wait for /health/ready
+        run: |
+          for i in $(seq 1 30); do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/health/ready || echo "000")
+            if [ "$CODE" = "200" ]; then
+              echo "API ready after $((i*2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "TIMEOUT: API never became ready"
+          exit 1
+
+      - name: Smoke E2E
+        run: python3 $PROD_DIR/scripts/smoke_e2e.py
 
       - name: Notify on success
         if: success()
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "✅ Deploy $SHORT_SHA succeeded: $COMMIT_MSG"
-          # Wire a Slack/Discord/Google Chat webhook here later. GitHub
-          # already sends commit-status emails; this is for ops dashboards.
+          echo "✅ Deploy $(git rev-parse --short HEAD) succeeded: $(git log -1 --pretty=%s)"
 
       - name: Notify on failure
         if: failure()
         run: |
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          echo "❌ Deploy $SHORT_SHA FAILED — automatic rollback should have run"
-          echo "Check $REPO_DIR/deploy.log and `docker compose ps`"
+          SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+          echo "❌ Deploy $SHORT FAILED"
+          echo "Check: tail -50 $PROD_DIR/deploy.log"
+          echo "And:   docker compose ps"
