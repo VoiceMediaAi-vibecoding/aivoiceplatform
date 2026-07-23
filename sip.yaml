@@ -11,10 +11,10 @@ ws_url: ws://localhost:7880
 redis:
   address: 127.0.0.1:6379
 
-# SIP signaling port (must be open to internet — TCP/UDP)
-# SECURITY: Access restricted to Twilio SIP IPs via iptables (scripts/sip_firewall.sh).
-# Do NOT open port 5060 broadly — this server has no built-in IP allowlist.
-sip_port: 5060
+# SIP signaling port. Internally on 5070 — iptables NAT redirects external
+# 5060 to this port with per-source-IP rate limiting so the livekit-sip
+# server's broken flood detection never trips on legitimate Twilio calls.
+sip_port: 5070
 
 # RTP media port range (must be open to internet — UDP)
 # Protected by iptables SIP_ALLOWLIST chain: only Twilio IPs allowed.
@@ -24,4 +24,4 @@ rtp_port: 10000-20000
 use_external_ip: true
 
 logging:
-  level: info
+  level: debug
