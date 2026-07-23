@@ -52,9 +52,11 @@ services:
       #   1. PID 1 (the sip process) is alive — catches crashes that the
       #      restart policy doesn't immediately retry.
       #   2. The UDP SIP socket is bound to port 5060 — appears in
-      #      /proc/net/udp6 as ":13C4" (5060 in hex). When the process
-      #      dies the kernel cleans the socket and the entry vanishes.
-      test: ["CMD-SHELL", "test -d /proc/1 && grep -q ':13C4' /proc/net/udp6 || exit 1"]
+      #      /proc/net/udp6 as ":13CE" (5070 in hex, since the sip server is
+      #      internally on 5070 and iptables NAT redirects external 5060 to it).
+      #      When the process dies the kernel cleans the socket and the entry
+      #      vanishes.
+      test: ["CMD-SHELL", "test -d /proc/1 && grep -q ':13CE' /proc/net/udp6 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
