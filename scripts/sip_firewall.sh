@@ -1,12 +1,28 @@
 #!/bin/bash
 # SIP port firewall: restricts port 5060 (TCP+UDP) and RTP (10000-20000 UDP) to
-# Twilio IPs only. Per-source-IP rate limiting on UDP 5060 (1 INVITE/sec burst 1)
-# prevents LiveKit SIP's internal flood protection (20 INVITEs/5sec) from triggering
-# when Twilio retries aggressively. Excess INVITEs are dropped silently.
+# Twilio + Telnyx SIP IPs only. Per-source-IP rate limiting on UDP 5060
+# (1 INVITE/sec burst 1) prevents LiveKit SIP's internal flood protection
+# (20 INVITEs/5sec) from triggering when carriers retry aggressively. Excess
+# INVITEs are dropped silently.
+#
 # Run as root. Safe to re-run — flushes SIP chains before re-applying.
+#
+# KNOWN FOOTGUN (fixed 2026-07): 172.110.223.0/24 was previously listed
+# here as "Twilio" but is NOT a Twilio range — SIP scanners/abusers use it
+# to flood port 5060 with junk INVITEs. With it in the allowlist, the
+# scanners reach LiveKit SIP and trigger its internal flood protection,
+# which then ALSO rejects legitimate Twilio calls with 486 BUSY. Removed.
+# Re-add only if Twilio ever starts using this range AND you have a way to
+# distinguish scanner traffic from real calls.
 set -euo pipefail
 
-# Twilio Elastic SIP Trunking signaling IPs (all regions)
+# Twilio Elastic SIP Trunking signaling IPs (all regions).
+# NOTE: 172.110.223.0/24 was previously in this list but is NOT actually
+# a Twilio range — it's a network that SIP scanners/abusers actively use to
+# flood port 5060 with junk INVITEs. Leaving it open triggers LiveKit's
+# internal flood protection (20 INVITEs/5sec → reject with 486), which
+# also blocks legitimate Twilio calls. If Twilio ever starts using this
+# range, add it back with a comment.
 TWILIO_SIP_IPS=(
     "54.172.60.0/30"
     "54.244.51.0/30"
@@ -16,7 +32,6 @@ TWILIO_SIP_IPS=(
     "54.169.127.128/30"
     "54.252.254.64/30"
     "177.71.206.192/30"
-    "172.110.223.0/24"
 )
 
 # Telnyx SIP signaling + media IP ranges
