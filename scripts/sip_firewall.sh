@@ -1,28 +1,30 @@
 #!/bin/bash
 # SIP port firewall: restricts port 5060 (TCP+UDP) and RTP (10000-20000 UDP) to
-# Twilio + Telnyx SIP IPs only. Per-source-IP rate limiting on UDP 5060
-# (1 INVITE/sec burst 1) prevents LiveKit SIP's internal flood protection
-# (20 INVITEs/5sec) from triggering when carriers retry aggressively. Excess
-# INVITEs are dropped silently.
+# Twilio + Telnyx SIP IPs only. Anything else gets dropped silently.
 #
 # Run as root. Safe to re-run — flushes SIP chains before re-applying.
 #
-# KNOWN FOOTGUN (fixed 2026-07): 172.110.223.0/24 was previously listed
-# here as "Twilio" but is NOT a Twilio range — SIP scanners/abusers use it
-# to flood port 5060 with junk INVITEs. With it in the allowlist, the
-# scanners reach LiveKit SIP and trigger its internal flood protection,
-# which then ALSO rejects legitimate Twilio calls with 486 BUSY. Removed.
-# Re-add only if Twilio ever starts using this range AND you have a way to
-# distinguish scanner traffic from real calls.
+# IMPORTANT — keep this in sync with the LiveKit SIP server's internal flood
+# protection. LiveKit SIP rejects calls with 486 BUSY when it sees more than
+# ~20 INVITEs/5sec TOTAL across all sources. Two things affect that counter:
+#   1. Legitimate Twilio retries (when a call fails, Twilio sends 2-4 INVITEs
+#      in quick succession).
+#   2. Scanner abuse from random IPs trying to INVITE garbage users
+#      (8888888, 1111111, etc.).
+# We block (2) at iptables so it never reaches LiveKit. We do NOT add a
+# per-source rate limit on Twilio's own IPs — Twilio's retry pattern is
+# bursty (multiple INVITEs within a second on failed calls) and a per-IP
+# hashlimit of even 5/sec would drop legitimate Twilio retries and
+# trigger LiveKit's flood protection anyway.
+#
+# KNOWN FOOTGUN (fixed 2026-07): 172.110.223.0/24 was previously listed as
+# "Twilio" but is NOT a Twilio range — SIP scanners/abusers use it to flood
+# port 5060 with junk INVITEs. With it in the allowlist, the scanners reach
+# LiveKit SIP and trigger its internal flood protection, which then ALSO
+# rejects legitimate Twilio calls with 486 BUSY. Removed.
 set -euo pipefail
 
 # Twilio Elastic SIP Trunking signaling IPs (all regions).
-# NOTE: 172.110.223.0/24 was previously in this list but is NOT actually
-# a Twilio range — it's a network that SIP scanners/abusers actively use to
-# flood port 5060 with junk INVITEs. Leaving it open triggers LiveKit's
-# internal flood protection (20 INVITEs/5sec → reject with 486), which
-# also blocks legitimate Twilio calls. If Twilio ever starts using this
-# range, add it back with a comment.
 TWILIO_SIP_IPS=(
     "54.172.60.0/30"
     "54.244.51.0/30"
@@ -34,7 +36,7 @@ TWILIO_SIP_IPS=(
     "177.71.206.192/30"
 )
 
-# Telnyx SIP signaling + media IP ranges
+# Telnyx SIP signaling + media IP ranges (in case you switch carriers).
 TELNYX_SIP_IPS=(
     "192.76.120.0/23"
     "185.246.40.0/24"
@@ -59,29 +61,19 @@ iptables -X SIP_ALLOWLIST 2>/dev/null || true
 # Create dedicated chain
 iptables -N SIP_ALLOWLIST 2>/dev/null || iptables -F SIP_ALLOWLIST
 
-# Per-source-IP rate limit: ACCEPT up to 1 INVITE/sec, DROP above.
-# Twilio rotates IPs in the /30 subnet, so per-IP rate limit applies
-# independently to each IP (4 IPs × 1/sec = 4 INVITEs/sec total, well below
-# LiveKit's 20/5sec flood limit). Combined with the DROP for excess, this
-# prevents Twilio retries from ever triggering flood.
-IDX=1
+# ACCEPT TCP 5060 (signaling) from each carrier subnet
 for SUBNET in "${TWILIO_SIP_IPS[@]}" "${TELNYX_SIP_IPS[@]}"; do
-    SAFE_NAME=$(echo "$SUBNET" | tr / -)
-    # ACCEPT up to 1 INVITE/sec per source IP (burst 1)
-    iptables -I SIP_ALLOWLIST $IDX -s "$SUBNET" -p udp --dport 5060 \
-        -m hashlimit --hashlimit-upto "1/sec" --hashlimit-burst 1 \
-        --hashlimit-mode srcip --hashlimit-htable-expire 30000 \
-        --hashlimit-name "tksip_${SAFE_NAME}" -j ACCEPT
-    # DROP any excess (above 1/sec)
-    iptables -I SIP_ALLOWLIST $((IDX + 1)) -s "$SUBNET" -p udp --dport 5060 \
-        -m hashlimit --hashlimit-above "1/sec" --hashlimit-burst 1 \
-        --hashlimit-mode srcip --hashlimit-htable-expire 30000 \
-        --hashlimit-name "tkex_${SAFE_NAME}" -j DROP
-    # TCP 5060: accept all (Twilio uses TCP for some signaling)
-    iptables -I SIP_ALLOWLIST $((IDX + 2)) -s "$SUBNET" -p tcp --dport 5060 -j ACCEPT
-    # UDP 10000-20000: RTP media
-    iptables -I SIP_ALLOWLIST $((IDX + 3)) -s "$SUBNET" -p udp --dport 10000:20000 -j ACCEPT
-    IDX=$((IDX + 4))
+    iptables -A SIP_ALLOWLIST -s "$SUBNET" -p tcp --dport 5060 -j ACCEPT
+done
+
+# ACCEPT UDP 5060 (signaling) — no per-source rate limit, see header comment
+for SUBNET in "${TWILIO_SIP_IPS[@]}" "${TELNYX_SIP_IPS[@]}"; do
+    iptables -A SIP_ALLOWLIST -s "$SUBNET" -p udp --dport 5060 -j ACCEPT
+done
+
+# ACCEPT UDP 10000-20000 (RTP media)
+for SUBNET in "${TWILIO_SIP_IPS[@]}" "${TELNYX_SIP_IPS[@]}"; do
+    iptables -A SIP_ALLOWLIST -s "$SUBNET" -p udp --dport 10000:20000 -j ACCEPT
 done
 
 # Drop everything else (silent drop)
